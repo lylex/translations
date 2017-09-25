@@ -8,3 +8,4 @@ When reading some articles, it is such a good happinese that I fortunately find 
 ### Articles
 
 * [A theory of modern Go](A-theory-of-modern-Go/A-theory-of-modern-Go-Chinese.md)
+* [Go best practices](Go-best-practices/Go-best-practices-Chinese.md)

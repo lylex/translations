@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<!-- saved from url=(0049)https://peter.bourgon.org/go-best-practices-2016/ -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Peter Bourgon · Go best practices, six years in</title>
+
+<meta name="description" content="Peter Bourgon has a website, and this is that website.">
+<meta name="author" content="Peter Bourgon">
+<meta name="keywords" content="peter bourgon programming c c++ go golang technology internet philosophy metallica">
+<meta name="viewport" content="width=device-width, initial-scale=0.5">
+<link href="./Go-best-practices_files/global.css" rel="stylesheet" type="text/css">
+
+
+<link href="./Go-best-practices_files/print.css" rel="stylesheet" type="text/css" media="print">
+<script type="text/javascript" async="" src="./Go-best-practices_files/ga.js"></script><script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-16576902-1']);
+  _gaq.push(['_setDomainName', 'bourgon.org']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+</script>
+</head>
+<body>
+<div id="c">
+
+<div id="header">
+<p>
+  <strong>Peter Bourgon</strong>
+  <a href="https://peter.bourgon.org/" title="Home">Home</a>
+  <a href="https://peter.bourgon.org/about" title="About">About</a>
+  <a href="https://peter.bourgon.org/talks" title="Talks">Talks</a>
+  <a href="https://peter.bourgon.org/blog" title="Blog">Blog</a>
+</p>
+<hr>
+</div>
+
+
+<h1>Go best practices, six years in</h1>
+
+<p>(<em>This article was originally a talk at QCon London 2016. <a href="https://www.infoq.com/presentations/go-patterns">Video and slides here</a>.</em>)</p>
+
+<p>In 2014, I gave a talk at the inaugural GopherCon titled <a href="https://peter.bourgon.org/go-in-production">Best Practices in Production Environments</a>.
+We were early adopters at <a href="https://soundcloud.com/">SoundCloud</a>, and by that point had been writing, running, and maintaining Go in production in one form or another for nearly 2 years.
+We had learned a few things, and I tried to distill and convey some of those lessons.</p>
+
+<p>Since then, I’ve continued working in Go full-time,
+ later on the activities and infrastructure teams at SoundCloud,
+ and now at <a href="https://weave.works/">Weaveworks</a>,
+  on <a href="https://weave.works/products/weave-scope">Weave Scope</a>
+  and <a href="https://github.com/weaveworks/mesh">Weave Mesh</a>.
+I’ve also been working hard on <a href="https://github.com/go-kit/kit">Go kit</a>,
+ an open-source toolkit for microservices.
+And all the while, I’ve been active in the Go community,
+ meeting lots of developers at meetups and conferences throughout Europe and the US,
+ and collecting their stories—both successes and failures.</p>
+
+<p>With the <a href="https://blog.golang.org/6years">6th anniversary</a> of Go’s release in November of 2015,
+ I thought back to that first talk.
+Which of those best practices have stood the test of time?
+Which have become outmoded or counterproductive?
+Are there any new practices that have emerged?
+In March, I had the opportunity to give a talk at <a href="https://qconlondon.com/">QCon London</a>
+ where I reviewed the best practices from 2014 and took a look at how Go has evolved in 2016.
+Here’s the meat of that talk.</p>
+
+<p>I’ve highlighted the key takeaways as linkable Top Tips.</p>
+
+<p><a name="top-tip-0"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-0">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Use Top Tips to level up your Go game.
+</div><p></p>
+
+<p>And a quick table of contents…</p>
+
+<ol>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#development-environment">Development environment</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#repository-structure">Repository structure</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#formatting-and-style">Formatting and style</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#configuration">Configuration</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#program-design">Program design</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#logging-and-instrumentation">Logging and instrumentation</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#testing">Testing</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#dependency-management">Dependency management</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#build-and-deploy">Build and deploy</a></li>
+<li><a href="https://peter.bourgon.org/go-best-practices-2016/#conclusion">Conclusion</a></li>
+</ol>
+
+<p><br><a name="development-environment"></a></p>
+
+<h2>Development environment &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#development-environment">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#development-environment">original</a></span></h2>
+
+<p>Go has development environment conventions centered around the GOPATH.
+In 2014 I advocated strongly for a single global GOPATH.
+My positioned has softened a bit.
+I still think that’s the best idea, all else equal, but depending on your project or team, other things may make sense, too.</p>
+
+<p>If you or your organization produces primarily binaries, you might find some advantages with a per-project GOPATH.
+There’s a new tool, <a href="https://getgb.io/">gb</a>, from Dave Cheney and contributors, which replaces the standard go tooling for this use-case.
+A lot of people are reporting a lot of success with it.</p>
+
+<p>Some Go developers use a two-entry GOPATH, e.g. <code>$HOME/go/external:$HOME/go/internal</code>.
+The go tool has always known how to deal with this: go get will fetch into the first path,
+ so it can be useful if you need strict separation of third-party vs. internal code.</p>
+
+<p>One thing I’ve noticed some developers forget to do:
+ put GOPATH/bin into your PATH.
+This allows you to easily run binaries you get via go get,
+ and makes the (preferred) go install mechanism of building code easier to work with.
+No reason not to do it.</p>
+
+<p><a name="top-tip-1"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-1">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Put $GOPATH/bin in your $PATH, so installed binaries are easily accessible.
+</div><p></p>
+
+<p>Regarding editors and IDEs, there’s been a lot of steady improvement.
+If you’re a vim warrior, life has never been better:
+ thanks to the tireless and extremely capable efforts of <a href="https://twitter.com/fatih">Fatih Arslan</a>,
+ the <a href="https://github.com/fatih/vim-go">vim-go</a> plugin is in an absolutely exceptional state,
+ best-in-class.
+I’m not as familiar with emacs, but <a href="https://twitter.com/dominikhonnef">Dominik Honnef’s</a>
+ <a href="https://github.com/dominikh/go-mode.el">go-mode.el</a> is still the big kahuna there.</p>
+
+<p>Moving up the stack, lots of folks are still using and having success with
+ <a href="https://www.sublimetext.com/">Sublime Text</a> + <a href="https://github.com/DisposaBoy/GoSublime">GoSublime</a>.
+And it’s hard to beat the speed.
+But more attention seems to be paid lately to the Electron-powered editors.
+<a href="https://atom.io/">Atom</a> + <a href="https://atom.io/packages/go-plus">go-plus</a> has many fans,
+ especially those developers that have to frequently switch languages to JavaScript.
+The dark horse has been <a href="https://code.visualstudio.com/">Visual Studio Code</a>
+ + <a href="https://github.com/Microsoft/vscode-go">vscode-go</a>, which,
+ while slower than Sublime Text, is noticably faster than Atom,
+ and has excellent default support for important-to-me features,
+ like click-to-definition.
+I’ve been using it daily for about half a year now,
+ after being introduced to it by <a href="https://github.com/tecbot">Thomas Adam</a>.
+Lots of fun.</p>
+
+<p>In terms of full IDEs, the purpose-built <a href="https://github.com/visualfc/liteide">LiteIDE</a>
+ has been receiving regular updates and certainly has its share of fans.
+And the <a href="https://github.com/go-lang-plugin-org/go-lang-idea-plugin">IntelliJ Go plugin</a>
+ has been consistently improving as well.</p>
+
+<p><br><a name="repository-structure"></a></p>
+
+<h2>Repository structure  &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#repository-structure">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#repository-structure">original</a></span></h2>
+
+<p><em><strong>Update</strong>: Ben Johnson has written an excellent article titled
+ <a href="https://medium.com/@benbjohnson/standard-package-layout-7cdbc8391fc1">Standard Package Layout</a>
+ with great advice for typical line-of-business applications.</em></p>
+
+<p><em><strong>Update</strong>: Tim Hockin’s
+ <a href="https://github.com/thockin/go-build-template">go-build-template</a>, adapted slightly,
+ has proven to be a better general model. I’ve adapted this section since its original publication.</em></p>
+
+<p>We’ve had a lot of time for projects to mature, and some patterns have emerged.
+While I believe there is no single best repo structure,
+ I think there is a good general model for many types of projects.
+It’s especially useful for projects that provide both binaries and libraries,
+ or combine Go code with other, non-Go assets.</p>
+
+<p>The basic idea is to have two top-level directories, pkg and cmd.
+Underneath pkg, create directories for each of your libraries.
+Underneath cmd, create directories for each of your binaries.
+All of your Go code should live exclusively in one of these locations.</p>
+
+<pre><code>github.com/peterbourgon/foo/
+  circle.yml
+  Dockerfile
+  cmd/
+    foosrv/
+      main.go
+    foocli/
+      main.go
+  pkg/
+    fs/
+      fs.go
+      fs_test.go
+      mock.go
+      mock_test.go
+    merge/
+      merge.go
+      merge_test.go
+    api/
+      api.go
+      api_test.go
+</code></pre>
+
+<p>All of your artifacts remain go gettable.
+The paths may be slightly longer, but the nomenclature is familiar to other Go developers.
+And you have space and isolation for non-Go assets.
+For example, Javascript can live in a client or ui subdirectory.
+Dockerfiles, continuous integration configs, or other build helpers
+ can live in the project root or in a build subdirectory.
+And runtime configuration like Kubernetes manifests can have a home, too.</p>
+
+<p><a name="top-tip-2"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-2">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Put library code under a pkg/ subdirectory. Put binaries under a cmd/ subdirectory.
+</div><p></p>
+
+<p>Of course, you’ll still use fully-qualified import paths.
+That is, the main.go in cmd/foosrv should <code>import "github.com/peterbourgon/foo/pkg/fs"</code>.
+And beware of the <a href="https://peter.bourgon.org/go-best-practices-2016/#dependency-management">ramifications of including a vendor dir</a> for downstream users.</p>
+
+<p><a name="top-tip-3"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-3">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Always use fully-qualified import paths. Never use relative imports.
+</div><p></p>
+
+<p>This little bit of structure makes us play nice in the broader ecosystem,
+ and hopefully continues to ensure our code is easy to consume.</p>
+
+<p><br><a name="formatting-and-style"></a></p>
+
+<h2>Formatting and style  &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#formatting-and-style">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#formatting-and-style">original</a></span></h2>
+
+<p>Things have stayed largely the same here.
+This is one area that Go has gotten quite right,
+ and I really appreciate the consensus in the community and stability in the language.</p>
+
+<p>The <a href="https://github.com/golang/go/wiki/CodeReviewComments">Code Review Comments</a> are great,
+ and should be the minimum set of critera you enforce during code review.
+And when there are disputes or inconsistencies in names,
+ Andrew Gerrand’s <a href="https://talks.golang.org/2014/names.slide">idiomatic naming conventions</a>
+  are a great set of guidelines.</p>
+
+<p><a name="top-tip-4"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-4">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Defer to Andrew Gerrand’s <a href="https://talks.golang.org/2014/names.slide">naming conventions</a>.
+</div><p></p>
+
+<p>And in terms of tooling, things have only gotten better.
+You should configure your editor to invoke gofmt—or, better, <a href="https://github.com/bradfitz/goimports">goimports</a>—on save.
+(At this point, I hope that’s not in any way controversial.)
+The go vet tool produces (<a href="https://github.com/golang/go/issues/9171">almost</a>!) no false positives,
+ so you might consider making it part of your precommit hook.
+And check out the excellent <a href="https://github.com/alecthomas/gometalinter">gometalinter</a> for linting concerns.
+This <em>can</em> produce false positives, so it’s not a bad idea to
+ <a href="https://github.com/weaveworks/mesh/blob/master/lint">encode your own conventions</a> somehow.</p>
+
+<p><br><a name="configuration"></a></p>
+
+<h2>Configuration  &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#configuration">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#configuration">original</a></span></h2>
+
+<p>Configuration is the surface area between the runtime environment and the process.
+It should be explicit and well-documented.
+I still use and recommend package flag, but I admit at this point I wish it were less esoteric.
+I wish it had standard, getopts-style long- and short-form argument syntax,
+ and I wish its usage text were much more compact.</p>
+
+<p><a href="http://12factor.net/">12-factor apps</a> encourage you to use environment vars for configuration,
+ and I think that’s fine, <em>provided each var is also defined as a flag</em>.
+Explicitness is important: changing the runtime behavior of an application
+ should happen in ways that are discoverable and documented.</p>
+
+<p>I said it in 2014 but I think it’s important enough to say again:
+ <a href="https://robots.thoughtbot.com/where-to-define-command-line-flags-in-go">define and parse your flags in func main</a>.
+Only func main has the right to decide the flags that will be available to the user.
+If your library code wants to parameterize its behavior,
+ those parameters should be part of type constructors.
+Moving configuration to package globals has the illusion of convenience, but it’s a false economy:
+ doing so breaks code modularity,
+ makes it more difficult for developers or future maintainers to understand dependency relationships,
+ and makes writing independent, parallelizable tests much more difficult.</p>
+
+<p><a name="top-tip-5"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-5">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Only func main has the right to decide which flags are available to the user.
+</div><p></p>
+
+<p>I think there’s a great opportunity for a well-scoped flags package to emerge from the community,
+ combining all of these characteristics.
+Maybe it already exists; if so, <a href="https://twitter.com/peterbourgon">please let me know</a>.
+I’d certainly use it.</p>
+
+<p><br><a name="program-design"></a></p>
+
+<h2>Program design &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#program-design">permalink</a></h2>
+
+<p>In the talk, I used configuration as a jumping-off point, to discuss a few other issues of program design.
+(I didn’t cover this in the 2014 version.)
+To start, let’s take a look at constructors.
+If we are properly parameterizing all of our dependencies, our constructors can get quite large.</p>
+
+<pre><code>foo, err := newFoo(
+    *fooKey,
+    bar,
+    100 * time.Millisecond,
+    nil,
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer foo.close()
+</code></pre>
+
+<p>Sometimes this kind of construction is best expressed with a config object:
+ a struct parameter to a constructor that takes <em>optional</em> parameters to the constructed object.
+Let’s assume fooKey is a required parameter,
+ and everything else either has a sensible default or is optional.
+Often, I see projects construct config objects in a sort of piecemeal way.</p>
+
+<pre><code>// Don't do this.
+cfg := fooConfig{}
+cfg.Bar = bar
+cfg.Period = 100 * time.Millisecond
+cfg.Output = nil
+
+foo, err := newFoo(*fooKey, cfg)
+if err != nil {
+    log.Fatal(err)
+}
+defer foo.close()
+</code></pre>
+
+<p>But it’s considerably nicer to leverage so-called struct initialization syntax
+ to construct the object all at once, in a single statement.</p>
+
+<pre><code>// This is better.
+cfg := fooConfig{
+    Bar:    bar,
+    Period: 100 * time.Millisecond,
+    Output: nil,
+}
+
+foo, err := newFoo(*fooKey, cfg)
+if err != nil {
+    log.Fatal(err)
+}
+defer foo.close()
+</code></pre>
+
+<p>No statements go by where the object is in an intermediate, invalid state.
+And all of the fields are nicely delimited and indented, mirroring the fooConfig definition.</p>
+
+<p>Notice we construct and then immediately use the cfg object.
+In this case we can save another degree of intermediate state, and another line of code,
+ by inlining the struct declaration into the newFoo constructor directly.</p>
+
+<pre><code>// This is even better.
+foo, err := newFoo(*fooKey, fooConfig{
+    Bar:    bar,
+    Period: 100 * time.Millisecond,
+    Output: nil,
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer foo.close()
+</code></pre>
+
+<p>Nice.</p>
+
+<p><a name="top-tip-6"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-6">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Use struct literal initialization to avoid invalid intermediate state.
+Inline struct declarations where possible.
+</div><p></p>
+
+<p>Let’s turn to the subject of sensible defaults.
+Observe that the Output parameter is something that can take a nil value.
+For the sake of argument, assume it’s an io.Writer.
+If we don’t do anything special, when we want to use it in our foo object,
+ we’ll have to first perform a nil check.</p>
+
+<pre><code>func (f *foo) process() {
+    if f.Output != nil {
+        fmt.Fprintf(f.Output, "start\n")
+    }
+    // ...
+}
+</code></pre>
+
+<p>That’s not great.
+It’s much safer, and nicer, to be able to use output without having to check it for existence.</p>
+
+<pre><code>func (f *foo) process() {
+     fmt.Fprintf(f.Output, "start\n")
+     // ...
+}
+</code></pre>
+
+<p>So we should provide a usable default here.
+With interface types, one good way is to pass something that provides a no-op implementation of the interface.
+And it turns out that the stdlib ioutil package comes with a no-op io.Writer, called ioutil.Discard.</p>
+
+<p><a name="top-tip-7"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-7">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Avoid nil checks via default no-op implementations.
+</div><p></p>
+
+<p>We could pass that into the fooConfig object, but that’s still fragile.
+If the caller forgets to do it at the callsite, we’ll still end up with a nil parameter.
+So, instead, we can create a sort of safety within the constructor.</p>
+
+<pre><code>func newFoo(..., cfg fooConfig) *foo {
+    if cfg.Output == nil {
+        cfg.Output = ioutil.Discard
+    }
+    // ...
+}
+</code></pre>
+
+<p>This is just an application of the Go idiom <em>make the zero value useful</em>.
+We allow the zero value of the parameter (nil) to yield good default behavior (no-op).</p>
+
+<p><a name="top-tip-8"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-8">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Make the zero value useful, especially in config objects.
+</div><p></p>
+
+<p>Let’s revisit the constructor.
+The parameters fooKey, bar, period, output are all <em>dependencies</em>.
+The foo object <em>depends</em> on each of them in order to start and run successfully.
+If there’s a single lesson I’ve learned from writing Go code in the wild
+ and observing large Go projects on a daily basis for the past six years, it is this:
+<strong>make dependencies explicit</strong>.</p>
+
+<p><a name="top-tip-9"></a></p><div class="toptip bigdeal"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-9">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Make dependencies explicit!
+</div><p></p>
+
+<p>An incredible amount of maintenance burden, confusion, bugs, and unpaid technical debt
+ can, I believe, be traced back to ambiguous or implicit dependencies.
+Consider this method on the type foo.</p>
+
+<pre><code>func (f *foo) process() {
+    fmt.Fprintf(f.Output, "start\n")
+    result := f.Bar.compute()
+    log.Printf("bar: %v", result) // Whoops!
+    // ...
+}
+</code></pre>
+
+<p>fmt.Printf is self-contained and doesn’t affect or depend on global state;
+ in functional terms, it has something like <em>referential transparency</em>.
+So it is not a dependency.
+Obviously, f.Bar is a dependency.
+And, interestingly, log.Printf acts on a package-global logger object,
+ it’s just obscured behind the free function Printf.
+So it, too, is a dependency.</p>
+
+<p>What do we do with dependencies?
+<strong>We make them explicit.</strong>
+Because the process method prints to a log as part of its work,
+ either the method or the foo object itself needs to take a logger object as a dependency.
+For example, log.Printf should become f.Logger.Printf.</p>
+
+<pre><code>func (f *foo) process() {
+    fmt.Fprintf(f.Output, "start\n")
+    result := f.Bar.compute()
+    f.Logger.Printf("bar: %v", result) // Better.
+    // ...
+}
+</code></pre>
+
+<p>We’re conditioned to think of certain classes of work, like writing to a log, as incidental.
+So we’re happy to leverage helpers, like package-global loggers, to reduce the apparent burden.
+But logging, like instrumentation, is often crucial to the operation of a service.
+And hiding dependencies in the global scope can and does come back to bite us,
+ whether it’s something as seemingly benign as a logger,
+  or perhaps another, more important, domain-specific component that we haven’t bothered to parameterize.
+Save yourself the future pain by being strict: make <em>all</em> your dependencies explicit.</p>
+
+<p><a name="top-tip-10"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-10">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Loggers are dependencies, just like references to other components,
+ database handles, commandline flags, etc.
+</div><p></p>
+
+<p>Of course, we should also be sure to take a sensible default for our logger.</p>
+
+<pre><code>func newFoo(..., cfg fooConfig) *foo {
+    // ...
+    if cfg.Logger == nil {
+        cfg.Logger = log.New(ioutil.Discard, ...)
+    }
+    // ...
+}
+</code></pre>
+
+<p><em>Update:</em> for more detail on this and the subject of magic, see the June 2017 blog post
+ on a <a href="https://peter.bourgon.org/blog/2017/06/09/theory-of-modern-go.html">theory of modern Go</a>.</p>
+
+<p><br><a name="logging-and-instrumentation"></a></p>
+
+<h2>Logging and instrumentation  &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#logging-and-instrumentation">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#logging-and-telemetry">original</a></span></h2>
+
+<p>To speak about the problem generally for a moment:
+ I’ve had a lot more production experience with logging,
+  which has mostly just increased my respect for the problem.
+Logging is expensive, more expensive than you think,
+ and can quickly become the bottleneck of your system.
+I wrote more extensively on the subject <a href="https://peter.bourgon.org/blog/2016/02/07/logging-v-instrumentation.html">in a separate blog post</a>,
+ but to re-cap:</p>
+
+<ul>
+<li>Log only <em>actionable information</em>, which will be read by a human or a machine</li>
+<li>Avoid fine-grained log levels — info and debug are probably enough</li>
+<li>Use structured logging — I’m biased, but I recommend <a href="https://github.com/go-kit/kit/tree/master/log">go-kit/log</a></li>
+<li>Loggers are dependencies!</li>
+</ul>
+
+<p>Where logging is expensive, instrumentation is cheap.
+You should be instrumenting every significant component of your codebase.
+If it’s a resource, like a queue, instrument it according to
+ <a href="http://www.brendangregg.com/usemethod.html">Brendan Gregg’s USE method</a>:
+  utilization, saturation, and error count (rate).
+If it’s something like an endpoint, instrument it according to
+ <a href="https://twitter.com/LindsayofSF/status/692191001692237825">Tom Wilkie’s RED method</a>:
+  request count (rate), error count (rate), and duration.</p>
+
+<p>If you have any choice in the matter,
+ <a href="https://prometheus.io/">Prometheus</a> is probably the instrumentation system you should be using.
+And, of course, metrics are dependencies, too!</p>
+
+<p>Let’s use loggers and metrics to pivot and address global state more directly.
+Here are some facts about Go:</p>
+
+<ul>
+<li>log.Print uses a fixed, global log.Logger</li>
+<li>http.Get uses a fixed, global http.Client</li>
+<li>http.Server, by default, uses a fixed, global log.Logger</li>
+<li>database/sql uses a fixed, global driver registry</li>
+<li>func init exists only to have side effects on package-global state</li>
+</ul>
+
+<p>These facts are convenient in the small, but awkward in the large.
+That is, how can we test the log output of components that use the fixed global logger?
+We must redirect its output, but then how can we test in parallel?
+Just don’t?
+That seems unsatisfactory.
+Or, if we have two independent components both making HTTP requests with different requirements,
+ how do we manage that?
+With the default global http.Client, it’s quite difficult.
+Consider this example.</p>
+
+<pre><code>func foo() {
+    resp, err := http.Get("http://zombo.com")
+    // ...
+}
+</code></pre>
+
+<p>http.Get calls on a global in package http.
+It has an implicit global dependency.
+Which we can eliminate pretty easily.</p>
+
+<pre><code>func foo(client *http.Client) {
+    resp, err := client.Get("http://zombo.com")
+    // ...
+}
+</code></pre>
+
+<p>Just pass an http.Client as a parameter.
+But that is a concrete type, which means if we want to test this function
+ we also need to provide a concrete http.Client,
+  which likely forces us to do actual HTTP communication.
+Not great.
+We can do one better, by passing an interface which can Do (execute) HTTP requests.</p>
+
+<pre><code>type Doer interface {
+    Do(*http.Request) (*http.Response, error)
+}
+
+func foo(d Doer) {
+    req, _ := http.NewRequest("GET", "http://zombo.com", nil)
+    resp, err := d.Do(req)
+    // ...
+}
+</code></pre>
+
+<p>http.Client satisfies our Doer interface automatically,
+ but now we have the freedom to pass a mock Doer implementation in our test.
+And that’s great: a unit test for func foo is meant to test only the behavior of foo,
+ it can safely assume that the http.Client is going to work as advertised.</p>
+
+<p>Speaking of testing…</p>
+
+<p><br><a name="testing"></a></p>
+
+<h2>Testing  &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#testing">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#testing">original</a></span></h2>
+
+<p>In 2014, I reflected on our experience with various testing frameworks and helper libraries,
+ and concluded that we never found a great deal of utility in any of them,
+ recommending the stdlib’s approach of plain package testing with table-based tests.
+Broadly, I still think this is the best advice.
+The important thing to remember about testing in Go is that <em>it is just programming</em>.
+It is not sufficiently different from other programming that it warrants its own metalanguage.
+And so package testing continues to be well-suited to the task.</p>
+
+<p>TDD/BDD packages bring new, unfamiliar DSLs and control structures,
+ increasing the cognitive burden on you and your future maintainers.
+I haven’t personally seen a codebase where that cost has paid off in benefits.
+Like global state, I believe these packages represent a false economy,
+ and more often than not are the product of cargo-culting behaviors from other languages and ecosystems.
+<em>When in Go, do as Gophers do</em>: we already have a language for writing simple,
+ expressive tests—it’s called Go, and you probably know it pretty well.</p>
+
+<p>With that said, I do recognize my own context and biases.
+Like with my opinions on the GOPATH, I’ve softened a bit,
+ and defer to those teams and organizations for whom a testing DSL or framework may make sense.
+If you know you want to use a package, go for it.
+Just be sure you’re doing it for well-defined reasons.</p>
+
+<p>Another incredibly interesting topic has been designing for testing.
+Mitchell Hashimoto recently gave a great talk on the subject here in Berlin
+ (<a href="https://speakerdeck.com/mitchellh/advanced-testing-with-go">SpeakerDeck</a>,
+  <a href="https://www.youtube.com/watch?v=yszygk1cpEc">YouTube</a>)
+ which I think should be required viewing.</p>
+
+<p>In general, the thing that seems to work the best is to write Go in a generally functional style,
+ where dependencies are explicitly enumerated, and provided as small, tightly-scoped interfaces whenever possible.
+Beyond being good software engineering discipline in itself,
+ it feels like it automatically optimizes your code for easy testing.</p>
+
+<p><a name="top-tip-11"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-11">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Use many small interfaces to model dependencies.
+</div><p></p>
+
+<p>As in the http.Client example just above, remember that unit tests should be written to
+ test the thing being tested, and nothing more.
+If you’re testing a process function,
+ there’s no reason to also test the HTTP transport the request came in on,
+  or the path on disk the results get written to.
+Provide inputs and outputs as fake implementations of interface parameters,
+ and focus on the business logic of the method or component exclusively.</p>
+
+<p><a name="top-tip-12"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-12">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Tests only need to test the thing being tested.
+</div><p></p>
+
+<p><br><a name="dependency-management"></a></p>
+
+<h2>Dependency management &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#dependency-management">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#dependency-management">original</a></span></h2>
+
+<p>Ever the hot topic.
+In 2014, things were nascent, and about the only concrete advice I could give was to vendor.
+That advice still holds today: vendoring is still the solution to dependency management for binaries.
+In particular, the GO15VENDOREXPERIMENT and its concomittant vendor/ subdirectory
+ have become default in Go 1.6.
+So you’ll be using that layout.
+And, thankfully, the tools have gotten a lot better.
+Some I can recommend:</p>
+
+<ul>
+<li><a href="https://github.com/FiloSottile/gvt">FiloSottile/gvt</a> takes a minimal approach,
+basically just extracting the vendor subcommand from the gb tool
+so it can be used standalone.</li>
+<li><a href="https://github.com/Masterminds/glide">Masterminds/glide</a> takes a maximal approach,
+attempting to recreate the feel and finish of a fully-featured dependency management tool
+using vendoring under the hood.</li>
+<li><a href="https://github.com/kardianos/govendor">kardianos/govendor</a> sits in the middle,
+providing probably the richest interface to vendoring-specific nouns and verbs,
+and is driving the conversation on the manifest file.</li>
+<li><a href="https://github.com/constabulary/gb">constabulary/gb</a> abandons the go tooling altogether
+in favor of a different repository layout and build mechanism.
+Great if you produce binaries and can mandate the build environment, e.g. in a corporate setting.</li>
+</ul>
+
+<p><a name="top-tip-13"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-13">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Use a top tool to vendor dependencies for your binary.
+</div><p></p>
+
+<p>A big caveat for libraries.
+In Go, dependency management is a concern of the binary author.
+Libraries with vendored dependencies are very difficult to use;
+ so difficult that it is probably better said that they are impossible to use.
+There are many corner cases and edge conditions that have played out in the months since
+ vendoring was officially introduced in 1.5.
+(You can dig in to <a href="https://groups.google.com/forum/#!topic/golang-dev/4FfTBfN2YaI">one of these</a>
+ <a href="https://groups.google.com/forum/#!msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ">forum posts</a>
+  if you’re particularly interested in the details.)
+Without getting too deep in the weeds, the lesson is clear:
+ libraries should <strong>never</strong> vendor dependencies.</p>
+
+<p><a name="top-tip-14"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-14">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Libraries should never vendor their dependencies.
+</div><p></p>
+
+<p>You can carve out an exception for yourself if your library has hermetically sealed its dependencies,
+ so that none of them escape to the exported (public) API layer.
+No dependent types referenced in any exported functions, method signatures, structures—anything.</p>
+
+<p>If you have the common task of maintaining an open-source repository
+ that contains both binaries and libraries,
+ unfortunately, you are stuck between a rock and a hard place.
+You want to vendor your deps for your binaries,
+ but you shouldn’t vendor them for your libraries,
+ and the GO15VENDOREXPERIMENT doesn’t admit this level of granularity,
+ from what appears to me to be regrettable oversight.</p>
+
+<p>Bluntly, I don’t have an answer to this.
+The etcd folks have hacked together <a href="https://github.com/coreos/etcd/tree/60425de0ff0dc8a2e7898fcd56f16669d4e4933b/cmd">a solution using symlinks</a>
+ which I cannot in good faith recommend,
+  as symlinks are not well-supported by the go toolchain and break entirely on Windows.
+That this works at all is more a happy accident than any consequence of design.
+I and others have raised all of these concerns <a href="https://github.com/golang/go/issues/15162">to the core team</a>,
+ and I hope something will happen in the near term.</p>
+
+<p><br><a name="build-and-deploy"></a></p>
+
+<h2>Build and deploy &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#build-and-deploy">permalink</a> <span class="orig"><a class="lite" href="https://peter.bourgon.org/go-in-production/#build-and-deploy">original</a></span></h2>
+
+<p>Regarding building, one important lesson learned, with a hat tip to Dave Cheney:
+ prefer go install to go build.
+The install verb caches build artifacts from dependencies in $GOPATH/pkg,
+ making builds faster.
+It also puts binaries in $GOPATH/bin,
+ making them easier to find and invoke.</p>
+
+<p><a name="top-tip-15"></a></p><div class="toptip"><a href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-15">✪</a>&nbsp;
+<strong>Top Tip</strong> —
+Prefer go install to go build.
+</div><p></p>
+
+<p>If you produce a binary, don’t be afraid to try out new build tools
+ like <a href="https://getgb.io/">gb</a>, which may significantly reduce your cognitive burden.
+Conversely, remember that since Go 1.5 cross-compilation is built-in;
+ just set the appropriate GOOS and GOARCH environment variables, and
+  invoke the appropriate go command.
+So there’s no need for extra tools here anymore.</p>
+
+<p>Regarding deployment, we Gophers have it pretty easy
+ compared to languages like Ruby or Python,
+  or even the JVM.
+One note: if you deploy in containers,
+ follow the <a href="https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.r4j4suwn2">advice of Kelsey Hightower</a> and do it FROM scratch.
+Go gives us this incredible opportunity; it’s a shame not to use it.</p>
+
+<p>As more general advice, think carefully before choosing a platform
+ or orchestration system—if you even choose one at all.
+Likewise for jumping onto the microservices bandwagon.
+An elegant monolith, deployed as an AMI to an autoscaling EC2 group,
+ is a very productive setup for small teams.
+Resist, or at least carefully consider, the hype.</p>
+
+<p><br><a name="conclusion"></a></p>
+
+<h2>Conclusion &nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#conclusion">permalink</a></h2>
+
+<p>The Top Tips:</p>
+
+<ol>
+<li>Put $GOPATH/bin in your $PATH, so installed binaries are easily accessible.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-1">link</a></li>
+<li>Put library code under a pkg/ subdirectory. Put binaries under a cmd/ subdirectory.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-2">link</a></li>
+<li>Always use fully-qualified import paths. Never use relative imports.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-3">link</a></li>
+<li>Defer to Andrew Gerrand’s <a href="https://talks.golang.org/2014/names.slide">naming conventions</a>.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-4">link</a></li>
+<li>Only func main has the right to decide which flags are available to the user.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-5">link</a></li>
+<li>Use struct literal initialization to avoid invalid intermediate state.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-6">link</a></li>
+<li>Avoid nil checks via default no-op implementations.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-7">link</a></li>
+<li>Make the zero value useful, especially in config objects.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-8">link</a></li>
+<li><strong>Make dependencies explicit!</strong>&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-9">link</a></li>
+<li>Loggers are dependencies, just like references to other components, database handles, commandline flags, etc.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-10">link</a></li>
+<li>Use many small interfaces to model dependencies.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-11">link</a></li>
+<li>Tests only need to test the thing being tested.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-12">link</a></li>
+<li>Use a top tool to vendor dependencies for your binary.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-13">link</a></li>
+<li>Libraries should never vendor their dependencies.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-14">link</a></li>
+<li>Prefer go install to go build.&nbsp;&nbsp;<a class="lite" href="https://peter.bourgon.org/go-best-practices-2016/#top-tip-15">link</a></li>
+</ol>
+
+<p>Go has always been a conservative language,
+ and its maturity has brought relatively few surprises and effectively no major changes.
+Consequently, and predictably, the community also hasn’t dramatically shifted its stances
+ on what’s considered best practice.
+Instead, we’ve seen a reification of tropes and proverbs
+ that were reasonably well-known in the early years,
+  and a gradual movement “up the stack” as design patterns, libraries, and program structures
+   are explored and transformed into idiomatic Go.</p>
+
+<p>Here’s to another 6 years of fun and productive Go programming. <a style="text-decoration:none;" href="https://twitter.com/peterbourgon/status/725297831221800960">🏌</a></p>
+
+<p><br>________<br><em><a href="https://peter.bourgon.org/">Go back to my website</a>, or <a href="http://twitter.com/peterbourgon">follow me on Twitter</a>.</em></p>
+
+
+</div>
+
+<audio controls="controls" style="display: none;"></audio></body><style type="text/css">#yddContainer{display:block;font-family:Microsoft YaHei;position:relative;width:100%;height:100%;top:-4px;left:-4px;font-size:12px;border:1px solid}#yddTop{display:block;height:22px}#yddTopBorderlr{display:block;position:static;height:17px;padding:2px 28px;line-height:17px;font-size:12px;color:#5079bb;font-weight:bold;border-style:none solid;border-width:1px}#yddTopBorderlr .ydd-sp{position:absolute;top:2px;height:0;overflow:hidden}.ydd-icon{left:5px;width:17px;padding:0px 0px 0px 0px;padding-top:17px;background-position:-16px -44px}.ydd-close{right:5px;width:16px;padding-top:16px;background-position:left -44px}#yddKeyTitle{float:left;text-decoration:none}#yddMiddle{display:block;margin-bottom:10px}.ydd-tabs{display:block;margin:5px 0;padding:0 5px;height:18px;border-bottom:1px solid}.ydd-tab{display:block;float:left;height:18px;margin:0 5px -1px 0;padding:0 4px;line-height:18px;border:1px solid;border-bottom:none}.ydd-trans-container{display:block;line-height:160%}.ydd-trans-container a{text-decoration:none;}#yddBottom{position:absolute;bottom:0;left:0;width:100%;height:22px;line-height:22px;overflow:hidden;background-position:left -22px}.ydd-padding010{padding:0 10px}#yddWrapper{color:#252525;z-index:10001;background:url(chrome-extension://eopjamdnofihpioajgfdikhhbobonhbb/ab20.png);}#yddContainer{background:#fff;border-color:#4b7598}#yddTopBorderlr{border-color:#f0f8fc}#yddWrapper .ydd-sp{background-image:url(chrome-extension://eopjamdnofihpioajgfdikhhbobonhbb/ydd-sprite.png)}#yddWrapper a,#yddWrapper a:hover,#yddWrapper a:visited{color:#50799b}#yddWrapper .ydd-tabs{color:#959595}.ydd-tabs,.ydd-tab{background:#fff;border-color:#d5e7f3}#yddBottom{color:#363636}#yddWrapper{min-width:250px;max-width:400px;}</style></html>
