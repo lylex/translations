@@ -7,10 +7,10 @@ _这篇文章本来是在2016年伦敦QConf上的一个讲话_
 
 在2014年的时候，我在GopherCon做了一个名为《产品环境的最佳实践》的开幕式演讲。我们在声云曾是Go的最早的使用者，并且从那时候起就一直在写Go、运行Go以及近两年的时间从一个产品到另外一个地在产品环境维护Go。我们学了一些东西，我在努力提炼和传授这些学到的东西。
 
-从那时候起，我就在Go全职工作了。
+从那时候起，我就在Go全职工作了，然后再声云的活动和基础架构团队，现在在Weaveworks，在做Weave Scope和Weave Mesh。我也在努力地做Go kit，那是一个为了微服务使用的开源套件。在这段时间里，我一直活跃在Go社区，在碰头会和正式会议上见了很多来自欧洲和美国的开发者，并收集了他们成功和失败的故事。
 
-Since then, I’ve continued working in Go full-time, later on the activities and infrastructure teams at SoundCloud, and now at Weaveworks, on Weave Scope and Weave Mesh. I’ve also been working hard on Go kit, an open-source toolkit for microservices. And all the while, I’ve been active in the Go community, meeting lots of developers at meetups and conferences throughout Europe and the US, and collecting their stories—both successes and failures.
+在Go的定于2015年11月的6周年发行版发布之际，我回想起第一次谈话。这些好的实践中的哪些，经受住了时间的考验？哪些已经成了过时的或者适得其反的？有没有一些新的实践显露出来？3月里，我有了在伦敦QCon做一个演讲的机会，在那我审阅了从2014年开始Go的好的实践，并看了在2016年中Go进化了哪些。这是这次谈话的的主要内容。
 
-With the 6th anniversary of Go’s release in November of 2015, I thought back to that first talk. Which of those best practices have stood the test of time? Which have become outmoded or counterproductive? Are there any new practices that have emerged? In March, I had the opportunity to give a talk at QCon London where I reviewed the best practices from 2014 and took a look at how Go has evolved in 2016. Here’s the meat of that talk.
+我已经高亮了重要的东西，来作为可以链接的Top Tips。
 
-I’ve highlighted the key takeaways as linkable Top Tips.
+
