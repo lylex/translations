@@ -113,8 +113,138 @@ _**更新**：Tim Hockin的[《go-build-template》](https://github.com/thockin/
 
 ## 程序设计
 
+在这个谈话中，我用了配置来作为起跳点，来探讨程序设计的其他问题。（我在2014年的谈话中，并没有涵盖这一点。）首先，我们看一看构造函数。如果我们合理地参数化所有的依赖，我们的构造函数会相当的大。
 
+    foo, err := newFoo(
+        *fooKey,
+        bar,
+        100 * time.Millisecond,
+        nil,
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer foo.close()
 
+有时候，这样的构造函数最好是用一个config对象：一个构造函数的struct参数，这个struct的结构化的对象带有_可选_的参数。让我们假设fooKey是一个required的参数，其他的都是合理的默认值或者是可选的。通常，我看到一般的项目都用一种零碎的方式来构造config对象。
 
+    // Don't do this.
+    cfg := fooConfig{}
+    cfg.Bar = bar
+    cfg.Period = 100 * time.Millisecond
+    cfg.Output = nil
+    
+    foo, err := newFoo(*fooKey, cfg)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer foo.close()
 
+但是，利用所谓的struct初始化语法来一次性地、在一条语句里构造对象是非常好的。
 
+    // This is better.
+    cfg := fooConfig{
+        Bar:    bar,
+        Period: 100 * time.Millisecond,
+        Output: nil,
+    }
+    
+    foo, err := newFoo(*fooKey, cfg)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer foo.close()
+
+当这个对象是一个中间状态、无效状态的时候，没有一条语句出现。并且，所有的field都被很好的分割和缩进，构造出这个fooConfig定义。
+
+注意到我们构造了这个cfg对象，并很快就使用它。这种情况下，我们可以节省另外一个中间状态的等级以及另外一行代码，这可以通过直接把struct的定义直接放到newFoo构造函数的行内来达成。
+
+    // This is even better.
+    foo, err := newFoo(*fooKey, fooConfig{
+        Bar:    bar,
+        Period: 100 * time.Millisecond,
+        Output: nil,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer foo.close()
+
+太好了。
+
+> **Top Tip -- 使用struct连续的初始化方法，来避免无效的中间状态。必要时候使用行内stuct初始化**
+
+让我们回到合理默认值的话题。观察到Output参数是可以用nil值的。看在参数的份子上，我们假设它是一个io.Writer。如果我们不做特别的事情的话，当我们想把它用在foo对象里时候，我们将不得不一开始就要做nil检测。
+
+    func (f *foo) process() {
+        if f.Output != nil {
+            fmt.Fprintf(f.Output, "start\n")
+        }
+        // ...
+    }
+
+那不够好，它必须更安全、更好，能够不必检查它的存在性就可以使用它。
+
+    func (f *foo) process() {
+         fmt.Fprintf(f.Output, "start\n")
+         // ...
+    }
+
+那么我们应当在这里提供一个有用的默认值。用interface类型，一个好的方式就是传递一个参数，它提供了interface的无需操作的实现。那就变成了标准库ioutil包用了一个无需操作的io.Writer，叫做ioutil.Discard。
+
+> **Top Tip -- 使用默认的no-op实现，来避免nil检测**
+
+我们能够把这个传递到fooConfig结构体中，但那仍然是脆弱的。如果调用者在调用的地方忘记了这么做，我们最终还是得到一个nil值。那么，相反地，我们能够在这个构造函数中做一些安全措施。
+
+    func newFoo(..., cfg fooConfig) *foo {
+        if cfg.Output == nil {
+            cfg.Output = ioutil.Discard
+        }
+        // ...
+    }
+
+这仅仅是一个Go俗语的应用，_让零值有用_。我们让这个参数的零值（nil）来产生一个好的默认行为（no-op）。
+
+> **Top Tip -- 让零值有用，特别是在config对象里**
+
+让我们再来看看构造函数。参数fooKey、bar、period和output都是依赖。foo对象依赖他们中的每一个，从而使得启动和运行成功。如果说我从在野外写Go代码和每天日常看Go代码的过去6年经历里学到一课的话，那就是：**让依赖显式化**。
+
+> **Top Tip -- 让依赖显式化！**
+
+我相信，一个难以置信的维护负担、困惑、bug和没有还清的技术债都可以追溯到含糊不清的或者不显式的依赖。考虑这个foo类型的一个方法。
+
+    func (f *foo) process() {
+        fmt.Fprintf(f.Output, "start\n")
+        result := f.Bar.compute()
+        log.Printf("bar: %v", result) // Whoops!
+        // ...
+    }
+
+fmt.Printf是自包含的并且没有影响或者依赖全局状态；从功能角度讲，它有着某种像是指示透明层的东西。因此它不是依赖。很明显地，f.Bar是依赖。并且，有趣的是，log.Printf作用在一个包全局logger对象上，它仅仅是被免费的函数Printf给掩盖了。因此，它也是一个依赖。
+
+我们怎么处理依赖呢？**我们把它们显式化**。因为这个处理函数把打印到一个log作为它的一项工作，或者是这个函数，或者是foo对象自己需要一个logger对象来作为它的依赖。例如，log.Printf应该成为f.Logger.Printf。
+
+    func (f *foo) process() {
+        fmt.Fprintf(f.Output, "start\n")
+        result := f.Bar.compute()
+        f.Logger.Printf("bar: %v", result) // Better.
+        // ...
+    }
+
+我们习惯于认为这样的工作，例如写log，是附带产物。因此，我们非常高兴地去依赖helpers，比如说包全局logger，来减少表面的依赖。但是logging，就像是instrumentation一样，经常是对于运维至关重要。并且，把依赖藏在包全局的作用域里这种的事能够并且也会反过来咬我们一口，比如说某些东西表面上看像是logger啦，或者其他的，更重要的、域相关的组件我们还没有去初始化的。用严格一点来节省你将来的痛苦：把一切的依赖都显示化。
+
+> **Top Tip -- logger是依赖，就像其他组件、数据库句柄或者命令行标记等的引用一样**
+
+当然了，我们应当为我们的logger弄一个合情合理的默认值。
+
+    func newFoo(..., cfg fooConfig) *foo {
+        // ...
+        if cfg.Logger == nil {
+            cfg.Logger = log.New(ioutil.Discard, ...)
+        }
+        // ...
+    }
+
+_更新：想了解这个的具体细节和魔法方面的命题，看2017年六月的博客[theory of modern Go](https://peter.bourgon.org/blog/2017/06/09/theory-of-modern-go.html)_
+
+## Logging和instrumentation
