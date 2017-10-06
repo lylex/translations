@@ -248,3 +248,56 @@ fmt.Printf是自包含的并且没有影响或者依赖全局状态；从功能�
 _更新：想了解这个的具体细节和魔法方面的命题，看2017年六月的博客[theory of modern Go](https://peter.bourgon.org/blog/2017/06/09/theory-of-modern-go.html)_
 
 ## Logging和instrumentation
+
+来泛泛地讲下这个问题：我有许多关于logging的产品经验，这已经使我增加了对这个问题的尊重。logging是很贵的，比你想的要贵很多，而且更够很快地成为你的系统的瓶颈。我在这个话题上写了更多的东西在[另外一个博客上](https://peter.bourgon.org/blog/2016/02/07/logging-v-instrumentation.html)，但是再在这里重申一下：
+
+* Log仅仅是_表述行为的信息_，是被用来让人活着机器读的
+* 避免细粒度的log等级--info和debug基本上就足够了
+* 使用结构化的logging--我是有偏见的，我推荐使用[go-kit/log](https://github.com/go-kit/kit/tree/master/log)
+* Log是比较贵的！
+
+当log比较贵的时候，instrumentation就是比较便宜的。你应当持续地 instrument你的代码的每个组件。如果它是资源，比如说一个队列，就根据[Brendan Gregg的USE方法](http://www.brendangregg.com/usemethod.html)来instrument它：使用数、饱和度和错误数。如果像是一个endpoint，就根据[Tom Wilkie的RED方法](https://twitter.com/LindsayofSF/status/692191001692237825)来instrument它：请求数（率），错误数（率）以及耗时。
+
+如果你在这件事上有任何选择，[Prometheus](https://prometheus.io/)或许就是你应该使用的instrument系统。而且，当然了，metrics也是依赖！
+
+让我们以loggers和metrices为支点，来直接地阐述全局状态。这里是Go的一些事实：
+
+* log.Print使用了固定的、全局的log.Logger
+* http.Get使用了固定的、全局的http.Client
+* http.Server默认地使用了固定的、全局的log.Logger
+* database/sql使用了固定的、全局的driver仓库
+* init函数的存在仅仅是为了对包全局状态产生边际效应
+
+这些事实在项目小的时候比较方便，大了就尴尬了。那就是，使用固定的全局logger的时候，我们怎么测试组件的log输出呢？我们必须重定向它的输出，那么我们怎么能并行测试呢？仅仅是不要？那就太不让人满意了。或者，如果我们有两个独立的组件都为了不同的需求发出HTTP请求，我们该怎么处理呢？如果用默认的全局http.Client，那就比较困难了。考虑这个例子。
+
+    func foo() {
+        resp, err := http.Get("http://zombo.com")
+        // ...
+    }
+
+http.Get在一个全局的http包上进行调用。它有一个隐含的全局依赖，我们很容易消除这个依赖。
+
+    func foo(client *http.Client) {
+        resp, err := client.Get("http://zombo.com")
+        // ...
+    }
+
+仅仅传一个http.Client作为参数。但是，那是个具体类型，这意味着如果我们需要测试这个方法的话，我们也要提供一个具体的http.Client，这像是在迫使我们进行真正的HTTP通信。不太好。我们能弄好点，通过传递一个执行HTTP请求的interface来达到。
+
+    type Doer interface {
+        Do(*http.Request) (*http.Response, error)
+    }
+    
+    func foo(d Doer) {
+        req, _ := http.NewRequest("GET", "http://zombo.com", nil)
+        resp, err := d.Do(req)
+        // ...
+    }
+
+http.Client自动地满足了我们的Doer接口，但是现在我们能够自由地在测试中传递一个mock的Doer实现了。这样就很好了：一个foo函数的单元测试仅仅意味着测试foo的行为，他能安全地假设http.Client正如广告说的那样工作。
+
+说道测试......
+
+## 测试
+
+在2014年，我们把我们的经验反映到各种各样的测试框架和辅助库上，结果，我们没有从他们中找到一个实用的，还是推荐标准库的简单的基于表的测试方法。概括起来讲，我还是认为这是最好的建议。关于在Go中测试，最重要的事情是要记住_它仅仅是在编程_。
