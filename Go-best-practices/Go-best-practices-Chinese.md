@@ -317,3 +317,22 @@ TDD/BDD包带来了新的、不熟悉的DSL和控制结构，增加了你和你�
 > **Top Tip -- 测试你正在测试的东西**
 
 ## 依赖管理
+
+永远都是热度话题。在2014年，事情才初露端倪，我能给的具体建议就是放到vendor中。这个建议在今天依然生效：把依赖放到vendor依然是二进制文件依赖管理的解决方法。具体来说，GO15VENDOREXPERIMENT和它的产物vendor/子目录已经成了Go1.6中的默认项了。因此，你将会一直使用这个布局。并且，谢天谢地，这个工具已经变得好了很多了。我能建议以下东西：
+
+* [FiloSottile/gvt](https://github.com/FiloSottile/gvt)采用了一个最小化的方法，基本上就是仅仅采用了gb工具的vendor子命令，因此，它能够被单独使用。
+* [Masterminds/glide](https://github.com/Masterminds/glide)采用了一个最大化的方法，通过包装地很好的vendor来试图重建使用体验和一个全功能的依赖管理工具。
+* [kardianos/govendor](https://github.com/kardianos/govendor)居于中间，提供了一个大概是最丰富的verder相关的名词和动词，在manifest文件上来操纵这个对话。
+* [constabulary/gb](https://github.com/constabulary/gb)完全摒弃了go的工具集，为了得到一个不同的代码仓库布局和build机制。如果你能生成二进制文件还能托管生成环境，比如说在一个共同的配置文件里，那就是非常好的。
+
+> **Top Tip -- 用一个顶级的工具来为你的二进制文件将依赖管理在vender下**
+
+给库文件提个醒。在Go里，依赖管理是二进制文件的作者需要担心的事情。那些在vendor中的依赖的库文件是很难使用的；难到说他们不能用似乎更好点了。自从vendor被官方引进到Go1.5以来，就有很多不常见的情况和边缘的条件出现了。（如果你对这个特别有兴趣的话，你可以挖一挖[这些](https://groups.google.com/forum/#!topic/golang-dev/4FfTBfN2YaI)[文章](https://groups.google.com/forum/#!msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ)。）无需在这些杂草中陷地太深，这个教训是很清楚的：库文件永远不要把依赖放进vendor。
+
+> **Top Tip -- 库文件永远不要把依赖放进vendor。**
+
+你能为你自己开创一些特例，如果你的库已经非常严密地密封了它的依赖的话，这样他们就没法逃脱导出的（公开）API层了。在任何的导出的函数、方法签名、结构体——任何事情——上引用依赖的类型。
+
+如果你有个常见的任务，去维护一个包含二进制文件和库文件的开源代码库，不幸的是，你被卡在了一个石头和一个坚硬的东西之间了。你想要为了你的二进制文件vendor你的依赖，但不应该vendor他们给你的库，并且GO15VENDOREXPERIMENT并不承认这个粒度的等级，对我来说，这个是个笔记遗憾的疏忽。
+
+坦率地讲，我对这个问题没有一个答案。etcd的伙计们用了一个[连接的解决方法](https://github.com/coreos/etcd/tree/60425de0ff0dc8a2e7898fcd56f16669d4e4933b/cmd)把他们给弄到一起去了，这我不太推荐，因为go的工具链对链接支持不是太好而且它在windows上就完全失效了。它毕竟能够有效，比起设计出来的结果，它更像一个令人开心的意外。我和其他的人已经把这些担忧报给了[核心团队](https://github.com/golang/go/issues/15162)，我希望在接下来的版本中会发生点什么。
