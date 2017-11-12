@@ -76,3 +76,69 @@ Go程序显式地在从进入的RPC和HTTP请求到出去的请求构成的整�
 如果你有应用参数需要传递的话，就把它放到参数中、在接受者中、在全局变量中，或者它真的属于那--Context的值中。
 
 Context是不可改变的，你想把同样的ctx传递到多个共享着同样的截止时间、取消信号、证书以及母跟踪等等的调用中，是可以的。
+
+## 复制
+
+为了避免意想不到的别名，从其他的包中复制一个struct时候要小心点。
+例如，bytes.Buffer类型包含了一个`[]byte`切片，以及一个这个切片可能指向的byte的小数组，作为对小字符串的一个优化。
+如果你复制了一个`Buffer`，这个复制中的切片可能还是原来那个数组的别名，这可能会给后续的方法调用带来意向不到的效果。
+
+通常说来，如果一个类型的方法关联着它的指针类型`*T`的时候,那就不要复制这个`T`类型的值。
+
+## 申明空切片
+
+申明一个空切片的时候，
+
+`var t []string`
+
+优于
+
+`t := []string{}`
+
+前者申明了一个nil切片值，而后者是一个非空的但是是零长度的。
+他们功能上相同——他们的`len`和`cap`都是零——但是nil切片是比较倾向的一种风格。
+
+注意，只有在非常少的情况下，非空零长的切片才是较好的，比如在编码JSON对象的时候（一个`nil`切片被编成`null`，而`[]string{}`被编成JSON数组`[]`）。
+
+在设计interface的时候，避免区别对待一个nil切片和一个非空零长切片，因为他们会导致微妙的编程错误。
+
+预知更多关于Go中的nil的讨论，请看Francesc Campoy的演讲《[Understanding Nil](https://www.youtube.com/watch?v=ynoY2xz-F8s)》
+
+## Crypto Rand
+
+不要使用`math/rand`来生成秘钥，哪怕是用完就抛弃的也不要用。不适用种子，这个生成器是完全可预测的。用了`time.Nanoseconds()`作为种子，也仅仅是一些熵而已。反而，使用`crypto/rand`的Reader，并且，如果你需要文本的话，打印成十六进制或者base64：
+
+```
+import (
+    "crypto/rand"
+    // "encoding/base64"
+    // "encoding/hex"
+    "fmt"
+)
+
+func Key() string {
+    buf := make([]byte, 16)
+    _, err := rand.Read(buf)
+    if err != nil {
+        panic(err)  // out of randomness, should never happen
+    }
+    return fmt.Sprintf("%x", buf)
+    // or hex.EncodeToString(buf)
+    // or base64.StdEncoding.EncodeToString(buf)
+}
+```
+
+## 文档评论
+
+所有顶级、导出的名字，都应当有文档评论，不是那么细碎的未导出类型以及函数申明也该有。看https://golang.org/doc/effective_go.html#commentary去了解更加详细的评论惯例。
+
+## 不要Panic
+
+看https://golang.org/doc/effective_go.html#errors。不要用panic来作为平常错误的处理。使用error和多返回值。
+
+## 错误字符串
+
+错误字符串不要用大写（除非以本就如此的名词或者缩略词开头）或者以标点符号结尾，因为他们一般是跟在其他的上下文后面被打印出来的。也就是，用`fmt.Errorf("something bad")`而不用`fmt.Errorf("Something bad")`，那么`log.Printf("Reading %s: %v", filename, err)`就格式化成不带大写字母在句子中的格式了。这不适用于logging，因为它是隐式地面向行并且不被组合在其他的消息中。
+
+## 例子
+
