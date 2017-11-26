@@ -52,7 +52,7 @@
 
     // Request represents a request to run a command.
     type Request struct { ...
-    
+
     // Encode writes the JSON encoding of req to w.
     func Encode(w io.Writer, req *Request) { ...
 
@@ -159,3 +159,50 @@ Goroutines能够以阻塞channel收发的方式泄漏：垃圾回收者不会回
 
 尽量让并发的代码足够的简洁，这样goroutine的生命周期就会明显。
 如果那是不可行的，就要用文档说明什么时候以及为什么这些goroutine退出。
+
+## 处理error
+
+看https://golang.org/doc/effective_go.html#errors。不要用`_`变量来放弃error。如果一个函数返回了一个error，检查它从而确保这个函数成功了。处理这个error，返回它，或者在一个真正超出异常的情境panic。
+
+## Import
+
+避免重命名import除非为了避免名字冲突；好的包名应当不需要重命名。遇到了这样的冲突的是的话，比较好的做法是重命名最本地化的或者项目相关的import。
+
+Import一个分组的形式组织，有空行来隔开它们。标准库的包始终在第一个分组中。
+
+package main
+
+```
+import (
+	"fmt"
+	"hash/adler32"
+	"os"
+
+	"appengine/foo"
+	"appengine/user"
+
+	"code.google.com/p/x/y"
+	"github.com/foo/bar"
+)
+```
+
+[goimports](https://godoc.org/golang.org/x/tools/cmd/goimports)会为你做这些。
+
+## Import点
+
+这种`.`import形式在一些测试中是非常有用的，因为循环依赖，导致一些包没法被测到：
+
+
+```
+package foo_test
+
+import (
+	"bar/testutil" // also imports "foo"
+	. "foo"
+)
+```
+
+在这个例子中，测试文件不可以在foo包中因为它使用了bar/testutil，而这个包导入了foo。因此我们使用'import .'形式来让这个文件假装成为foo包的一部分尽管实际不是的。出了这种情况，不要在你的程序中使用import.。它使你的程序很难懂，因为它不是很清楚的，比如一个类似Quux使一个在这个当前包中的顶层的标示符还是一个导入的包中的，很不清楚。
+
+## In-Band Errors
+
