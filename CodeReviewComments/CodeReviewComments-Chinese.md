@@ -206,3 +206,48 @@ import (
 
 ## In-Band Errors
 
+在C和类似的语言中，函数返回-1或者null这样的值给error或者结果缺失，是比较常见的一种做法：
+
+```
+// Lookup returns the value for key or "" if there is no mapping for key.
+func Lookup(key string) string
+
+// Failing to check a for an in-band error value can lead to bugs:
+Parse(Lookup(key))  // returns "parse failure for value" instead of "no value for key"
+```
+
+Go对于多返回值的支持提供了一个较好的解决方案。
+与其要求客户端检查一个in-band错误的值，一个函数应当返回一个额外的值来表示其他的返回值是不是有效。
+这个返回值可以是一个error，或者在不必要解释的时候用一个布尔值也行。
+它必须是最后一个返回值。
+
+```
+// Lookup returns the value for key or ok=false if there is no mapping for key.
+func Lookup(key string) (value string, ok bool)
+```
+
+这样可以让调用者避免错误地使用结果：
+
+```
+Parse(Lookup(key))  // compile-time error
+```
+
+并能够激励出更加鲁棒和易读的代码：
+
+```
+value, ok := Lookup(key)
+if !ok  {
+    return fmt.Errorf("no value for %q", key)
+}
+return Parse(value)
+```
+
+这个规则适用于导出的函数，但对未导出的函数也依然适用。
+
+像nil，“”和-1这样的返回值也是可以的，只要它们对于函数是一个有效的结果，那就是，调用者不需要跟其他值区别开来处理它们就行。
+
+一些标准库函数，比如那些在"strings"包中的，返回in-band错误值。
+这以程序猿的更多的努力为代价，换来了对于字符串操纵代码的极大简化。
+总体说来，go代码应当返回额外的值给error。
+
+## 缩短error流
